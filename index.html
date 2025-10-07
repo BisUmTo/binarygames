@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="it">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Binary Games</title>
+    <link rel="stylesheet" href="style.css" />
+    <script type="module" src="main.js" defer></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <h1>Binary Games</h1>
+        <p>
+          Impara il sistema binario e la logica booleana con giochi interattivi.
+          Completa gli obiettivi in ogni round per avanzare e migliorare la tua
+          intuizione sul funzionamento dei numeri binari.
+        </p>
+      </div>
+    </header>
+
+    <main class="wrap">
+      <div class="tabs" data-tabs>
+        <div class="tab-list" role="tablist" aria-label="Seleziona il gioco">
+          <button
+            id="tab-balance"
+            class="tab-button"
+            type="button"
+            role="tab"
+            aria-selected="true"
+            aria-controls="balance-game"
+          >
+            Bilancia
+          </button>
+          <button
+            id="tab-switches"
+            class="tab-button"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            aria-controls="switches-game"
+          >
+            Interruttori
+          </button>
+        </div>
+
+        <section
+          id="balance-game"
+          class="card tab-panel"
+          role="tabpanel"
+          aria-labelledby="tab-balance"
+        >
+          <h2>Bilancia</h2>
+          <p>
+            Bilancia il numero casuale usando i pesi con potenze di 2. Seleziona
+            i pesetti con un clic o un tocco per aggiungerli al piatto sinistro e
+            raggiungere l'equilibrio.
+          </p>
+          <div class="game-layout">
+            <div class="balance-area">
+              <div class="scale">
+                <div class="scale-arm">
+                  <div class="plate plate-left" data-side="left">
+                    <ul class="plate-items"></ul>
+                  </div>
+                  <div class="pivot"></div>
+                  <div class="plate plate-right">
+                    <div class="target-value">0</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="weights-area">
+              <h3>Pesi disponibili</h3>
+              <ul class="weights-list"></ul>
+            </div>
+          </div>
+          <div class="game-status">
+            <div>Round: <span class="round-counter">1</span></div>
+            <div>Somma attuale: <span class="current-sum">0</span></div>
+            <button class="next-round" type="button">Nuovo round</button>
+            <p class="message" aria-live="polite"></p>
+          </div>
+        </section>
+
+        <section
+          id="switches-game"
+          class="card tab-panel"
+          role="tabpanel"
+          aria-labelledby="tab-switches"
+          hidden
+        >
+          <h2>Interruttori</h2>
+          <p>
+            Accendi o spegni gli interruttori per sommare le potenze di 2 e
+            raggiungere il valore obiettivo. Ogni interruttore controlla la
+            lampada corrispondente.
+          </p>
+          <div class="switches-grid">
+            <div class="switches-row"></div>
+            <div class="values-row">
+              <div class="value-label">
+                Valore attuale: <span class="current-value">0</span>
+              </div>
+              <div class="target-label">
+                Obiettivo: <span class="target-value">0</span>
+              </div>
+              <button class="next-round" type="button">Nuovo round</button>
+            </div>
+            <div class="message" aria-live="polite"></div>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <footer>
+      <div class="wrap">
+        <small>&copy; <span id="year"></span> Binary Games</small>
+      </div>
+    </footer>
+  </body>
+</html>
