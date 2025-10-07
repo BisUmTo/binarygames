@@ -1,8 +1,161 @@
 const randomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 
-class BalanceGame {
+const ROUND_STORAGE_KEY = "binaryGamesRoundStats";
+
+class RoundTracker {
   constructor(root) {
     this.root = root;
+    this.button = root.querySelector(".round-tracker__button");
+    this.panel = root.querySelector(".round-tracker__panel");
+    this.totalEl = root.querySelector("[data-round-total]");
+    this.countEls = {
+      balance: root.querySelector('[data-round-game="balance"]'),
+      switches: root.querySelector('[data-round-game="switches"]')
+    };
+    this.state = { balance: 0, switches: 0 };
+    this.isPanelOpen = false;
+    this.storageAvailable = this.checkStorageAvailability();
+
+    this.handleDocumentClick = this.handleDocumentClick.bind(this);
+    this.handleKeyup = this.handleKeyup.bind(this);
+    this.togglePanel = this.togglePanel.bind(this);
+
+    this.load();
+    this.updateDisplay();
+    this.attachEvents();
+  }
+
+  checkStorageAvailability() {
+    try {
+      const testKey = "__binary_games_rounds__";
+      window.localStorage.setItem(testKey, "1");
+      window.localStorage.removeItem(testKey);
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  load() {
+    if (!this.storageAvailable) {
+      return;
+    }
+    try {
+      const stored = window.localStorage.getItem(ROUND_STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        this.state = {
+          balance: Number(parsed.balance) || 0,
+          switches: Number(parsed.switches) || 0
+        };
+      }
+    } catch (error) {
+      this.state = { balance: 0, switches: 0 };
+    }
+  }
+
+  save() {
+    if (!this.storageAvailable) {
+      return;
+    }
+    try {
+      window.localStorage.setItem(ROUND_STORAGE_KEY, JSON.stringify(this.state));
+    } catch (error) {
+      // Ignore storage quota failures
+    }
+  }
+
+  attachEvents() {
+    if (this.button) {
+      this.button.addEventListener("click", this.togglePanel);
+    }
+  }
+
+  togglePanel() {
+    if (!this.button || !this.panel) {
+      return;
+    }
+    if (this.isPanelOpen) {
+      this.closePanel();
+    } else {
+      this.openPanel();
+    }
+  }
+
+  openPanel() {
+    if (!this.button || !this.panel) {
+      return;
+    }
+    this.isPanelOpen = true;
+    this.root.classList.add("is-open");
+    this.button.setAttribute("aria-expanded", "true");
+    this.panel.removeAttribute("hidden");
+    document.addEventListener("click", this.handleDocumentClick);
+    document.addEventListener("keyup", this.handleKeyup);
+  }
+
+  closePanel() {
+    if (!this.button || !this.panel) {
+      return;
+    }
+    this.isPanelOpen = false;
+    this.root.classList.remove("is-open");
+    this.button.setAttribute("aria-expanded", "false");
+    this.panel.setAttribute("hidden", "");
+    document.removeEventListener("click", this.handleDocumentClick);
+    document.removeEventListener("keyup", this.handleKeyup);
+  }
+
+  handleDocumentClick(event) {
+    if (!this.root.contains(event.target)) {
+      this.closePanel();
+    }
+  }
+
+  handleKeyup(event) {
+    if (event.key === "Escape") {
+      this.closePanel();
+      this.button?.focus();
+    }
+  }
+
+  increment(gameKey) {
+    if (!Object.prototype.hasOwnProperty.call(this.state, gameKey)) {
+      this.state[gameKey] = 0;
+    }
+    this.state[gameKey] += 1;
+    this.updateDisplay();
+    this.save();
+    this.root.classList.add("is-updated");
+    window.setTimeout(() => {
+      this.root.classList.remove("is-updated");
+    }, 650);
+  }
+
+  getTotal() {
+    const balanceCount = Number(this.state.balance) || 0;
+    const switchCount = Number(this.state.switches) || 0;
+    return balanceCount + switchCount;
+  }
+
+  updateDisplay() {
+    const total = this.getTotal();
+    if (this.totalEl) {
+      this.totalEl.textContent = String(total);
+    }
+    Object.entries(this.countEls).forEach(([key, element]) => {
+      if (element) {
+        const value = Number(this.state[key]) || 0;
+        element.textContent = String(value);
+      }
+    });
+  }
+}
+
+class BalanceGame {
+  constructor(root, tracker) {
+    this.root = root;
+    this.tracker = tracker || null;
     this.weights = [1, 2, 4, 8, 16, 32];
     this.maxTotal = this.weights.reduce((acc, val) => acc + val, 0);
     this.maxTiltDegrees = 9;
@@ -85,6 +238,8 @@ class BalanceGame {
   updateStatus() {
     const sum = this.getCurrentSum();
     this.elements.currentSum.textContent = sum;
+    const isOver = sum > this.state.target;
+    this.elements.currentSum.classList.toggle("value-over", isOver);
     this.updateTilt(sum);
   }
 
@@ -136,13 +291,17 @@ class BalanceGame {
   }
 
   checkCompletion() {
-    if (this.getCurrentSum() === this.state.target) {
-      this.elements.message.textContent = "Perfetto! Hai bilanciato il numero.";
-      this.roundTimeout = setTimeout(() => {
-        this.state.round += 1;
-        this.startRound({ resetRoundCounter: false });
-      }, 1400);
-    } else {
+    const currentSum = this.getCurrentSum();
+    if (currentSum === this.state.target) {
+      if (!this.roundTimeout) {
+        this.elements.message.textContent = "Perfetto! Hai bilanciato il numero.";
+        this.tracker?.increment("balance");
+        this.roundTimeout = setTimeout(() => {
+          this.state.round += 1;
+          this.startRound({ resetRoundCounter: false });
+        }, 1400);
+      }
+    } else if (!this.roundTimeout) {
       this.elements.message.textContent = "";
     }
   }
@@ -162,8 +321,9 @@ class BalanceGame {
 }
 
 class SwitchesGame {
-  constructor(root) {
+  constructor(root, tracker) {
     this.root = root;
+    this.tracker = tracker || null;
     this.bits = Array.from({ length: 8 }, (_, idx) => 2 ** (7 - idx));
     this.state = {
       target: 0,
@@ -238,6 +398,8 @@ class SwitchesGame {
   updateStatus() {
     const current = this.getCurrentValue();
     this.elements.currentValue.textContent = current;
+    const isOver = current > this.state.target;
+    this.elements.currentValue.classList.toggle("value-over", isOver);
   }
 
   getCurrentValue() {
@@ -264,12 +426,16 @@ class SwitchesGame {
   }
 
   checkCompletion() {
-    if (this.getCurrentValue() === this.state.target) {
-      this.elements.message.textContent = "Ben fatto! Nuovo round in arrivo...";
-      this.roundTimeout = setTimeout(() => {
-        this.startRound({ keepMessage: false });
-      }, 1400);
-    } else {
+    const current = this.getCurrentValue();
+    if (current === this.state.target) {
+      if (!this.roundTimeout) {
+        this.elements.message.textContent = "Ben fatto! Nuovo round in arrivo...";
+        this.tracker?.increment("switches");
+        this.roundTimeout = setTimeout(() => {
+          this.startRound({ keepMessage: false });
+        }, 1400);
+      }
+    } else if (!this.roundTimeout) {
       this.elements.message.textContent = "";
     }
   }
@@ -372,13 +538,15 @@ const initFooterYear = () => {
 };
 
 window.addEventListener("DOMContentLoaded", () => {
+  const trackerRoot = document.querySelector("[data-round-tracker]");
+  const roundTracker = trackerRoot ? new RoundTracker(trackerRoot) : null;
   const balanceRoot = document.getElementById("balance-game");
   const switchesRoot = document.getElementById("switches-game");
   if (balanceRoot) {
-    new BalanceGame(balanceRoot);
+    new BalanceGame(balanceRoot, roundTracker);
   }
   if (switchesRoot) {
-    new SwitchesGame(switchesRoot);
+    new SwitchesGame(switchesRoot, roundTracker);
   }
   document.querySelectorAll("[data-tabs]").forEach((tabContainer) => {
     new TabsController(tabContainer);

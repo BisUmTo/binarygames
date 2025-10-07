@@ -17,6 +17,33 @@
           intuizione sul funzionamento dei numeri binari.
         </p>
       </div>
+      <div class="round-tracker" data-round-tracker>
+        <button
+          id="round-tracker-button"
+          class="round-tracker__button"
+          type="button"
+          aria-haspopup="true"
+          aria-expanded="false"
+          aria-controls="round-tracker-panel"
+        >
+          <span class="round-tracker__label">Round completati</span>
+          <span class="round-tracker__total" data-round-total>0</span>
+        </button>
+        <div
+          id="round-tracker-panel"
+          class="round-tracker__panel"
+          role="region"
+          aria-labelledby="round-tracker-button"
+          hidden
+        >
+          <h3>Dettaglio</h3>
+          <ul>
+            <li><span>Bilancia</span><span data-round-game="balance">0</span></li>
+            <li><span>Interruttori</span><span data-round-game="switches">0</span></li>
+          </ul>
+          <p class="round-tracker__hint">I progressi sono salvati sul tuo dispositivo.</p>
+        </div>
+      </div>
     </header>
 
     <main class="wrap">
