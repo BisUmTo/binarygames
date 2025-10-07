@@ -4,6 +4,8 @@ class BalanceGame {
   constructor(root) {
     this.root = root;
     this.weights = [1, 2, 4, 8, 16, 32];
+    this.maxTotal = this.weights.reduce((acc, val) => acc + val, 0);
+    this.maxTiltDegrees = 9;
     this.state = {
       round: 1,
       target: 0,
@@ -18,36 +20,39 @@ class BalanceGame {
       currentSum: root.querySelector(".current-sum"),
       targetValue: root.querySelector(".target-value"),
       nextRoundBtn: root.querySelector(".next-round"),
-      message: root.querySelector(".message")
+      message: root.querySelector(".message"),
+      scaleArm: root.querySelector(".scale-arm")
     };
 
-    this.renderWeights();
     this.attachEvents();
     this.startRound({ resetRoundCounter: false });
   }
 
   renderWeights() {
     this.elements.weightsList.innerHTML = "";
-    this.weights.forEach((value) => {
-      const item = document.createElement("li");
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "weight";
-      btn.dataset.value = value;
-      btn.textContent = value;
-      btn.title = `Peso da ${value}`;
-      btn.addEventListener("click", () => this.toggleWeight(value));
-      btn.addEventListener("keydown", (event) => {
-        if (event.key === " " || event.key === "Enter") {
-          event.preventDefault();
-          this.toggleWeight(value);
-        }
+    const orderedWeights = [...this.weights].sort((a, b) => b - a);
+    orderedWeights
+      .filter((value) => !this.state.selected.has(value))
+      .forEach((value) => {
+        const item = document.createElement("li");
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "weight";
+        btn.dataset.value = value;
+        btn.textContent = value;
+        btn.title = `Peso da ${value}`;
+        btn.setAttribute("aria-label", `Aggiungi il peso ${value}`);
+        btn.addEventListener("click", () => this.addWeight(value));
+        btn.addEventListener("keydown", (event) => {
+          if (event.key === " " || event.key === "Enter") {
+            event.preventDefault();
+            this.addWeight(value);
+          }
+        });
+        btn.tabIndex = 0;
+        item.appendChild(btn);
+        this.elements.weightsList.appendChild(item);
       });
-      btn.setAttribute("aria-pressed", "false");
-      btn.tabIndex = 0;
-      item.appendChild(btn);
-      this.elements.weightsList.appendChild(item);
-    });
   }
 
   attachEvents() {
@@ -56,33 +61,23 @@ class BalanceGame {
     });
   }
 
-  toggleWeight(value) {
-    if (this.state.selected.has(value)) {
-      this.state.selected.delete(value);
-    } else {
-      this.state.selected.add(value);
-    }
-    this.updateWeightsUI();
-    this.updatePlate();
-    this.updateStatus();
-    this.checkCompletion();
-  }
-
-  updateWeightsUI() {
-    this.elements.weightsList.querySelectorAll(".weight").forEach((btn) => {
-      const val = Number(btn.dataset.value);
-      const isActive = this.state.selected.has(val);
-      btn.classList.toggle("active", isActive);
-      btn.setAttribute("aria-pressed", isActive ? "true" : "false");
-    });
-  }
-
-  updatePlate() {
+  renderPlate() {
     this.elements.plateItems.innerHTML = "";
-    const items = Array.from(this.state.selected).sort((a, b) => a - b);
+    const items = Array.from(this.state.selected).sort((a, b) => b - a);
     items.forEach((value) => {
       const li = document.createElement("li");
       li.textContent = value;
+      li.dataset.value = value;
+      li.tabIndex = 0;
+      li.setAttribute("role", "button");
+      li.setAttribute("aria-label", `Rimuovi il peso ${value} dal piatto`);
+      li.addEventListener("click", () => this.removeWeight(value));
+      li.addEventListener("keydown", (event) => {
+        if (event.key === " " || event.key === "Enter") {
+          event.preventDefault();
+          this.removeWeight(value);
+        }
+      });
       this.elements.plateItems.appendChild(li);
     });
   }
@@ -90,6 +85,7 @@ class BalanceGame {
   updateStatus() {
     const sum = this.getCurrentSum();
     this.elements.currentSum.textContent = sum;
+    this.updateTilt(sum);
   }
 
   getCurrentSum() {
@@ -98,24 +94,45 @@ class BalanceGame {
     return total;
   }
 
+  addWeight(value) {
+    if (this.state.selected.has(value)) {
+      return;
+    }
+    this.state.selected.add(value);
+    this.refreshUI();
+    this.checkCompletion();
+  }
+
+  removeWeight(value) {
+    if (!this.state.selected.has(value)) {
+      return;
+    }
+    this.state.selected.delete(value);
+    this.refreshUI();
+    this.checkCompletion();
+  }
+
+  refreshUI() {
+    this.renderWeights();
+    this.renderPlate();
+    this.updateStatus();
+  }
+
   startRound({ resetRoundCounter }) {
     if (this.roundTimeout) {
       clearTimeout(this.roundTimeout);
       this.roundTimeout = null;
     }
-    this.state.selected.clear();
-    this.updateWeightsUI();
-    this.updatePlate();
-    this.elements.currentSum.textContent = "0";
-    this.elements.message.textContent = "";
-
     if (resetRoundCounter) {
       this.state.round += 1;
     }
-    this.state.target = randomInt(1, this.weights.reduce((acc, val) => acc + val, 0));
+    this.state.selected.clear();
+    this.state.target = randomInt(1, this.maxTotal);
 
     this.elements.targetValue.textContent = this.state.target;
     this.elements.roundCounter.textContent = this.state.round;
+    this.elements.message.textContent = "";
+    this.refreshUI();
   }
 
   checkCompletion() {
@@ -128,6 +145,19 @@ class BalanceGame {
     } else {
       this.elements.message.textContent = "";
     }
+  }
+
+  updateTilt(currentSum) {
+    const scaleArm = this.elements.scaleArm;
+    if (!scaleArm) {
+      return;
+    }
+
+    const target = this.state.target || 0;
+    const diff = target - currentSum;
+    const ratio = this.maxTotal === 0 ? 0 : Math.max(-1, Math.min(1, diff / this.maxTotal));
+    const angle = ratio * this.maxTiltDegrees;
+    scaleArm.style.setProperty("--tilt-angle", `${angle}deg`);
   }
 }
 
